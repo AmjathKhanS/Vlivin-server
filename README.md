@@ -6,6 +6,8 @@ home-screen widget summary. Built from the design handoff (`design_handoff_vlivi
 
 Stack: Node 20+, TypeScript, Fastify 5, `@fastify/websocket`, JWT auth, Zod validation, Vitest.
 
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the full setup and hosting guide.
+
 ## Run
 
 ```bash
