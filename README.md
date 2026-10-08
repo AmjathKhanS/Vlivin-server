@@ -12,17 +12,20 @@ Stack: Node 20+, TypeScript, Fastify 5, `@fastify/websocket`, JWT auth, Zod vali
 cp .env.example .env     # set JWT_SECRET (32+ chars) for production
 npm install
 npm run dev              # http://localhost:3000
-npm run typecheck && npm test
+npm run typecheck && npm test && npm run test:pg
 npm run build && npm start
 ```
 
 ## Status and known gaps
 
-- **Storage is in-memory** (`src/store/memory.ts`). Data is lost on restart and the server runs as a
-  single instance. `src/store/store.ts` is the persistence interface and `db/schema.sql` is the
-  target Postgres/Supabase schema. **Next step:** write a `PostgresStore` against that interface.
+- **Storage:** set `DATABASE_URL` to use Postgres (`src/store/postgres.ts`); migrations in
+  `db/migrations` run on boot (or `npm run db:migrate`). Without it the server uses an in-memory store
+  and logs a warning. `DATABASE_URL` is required in production. The same test suite also runs on real
+  Postgres via `npm run test:pg` (in-process PGlite, no server needed).
+- **OTP codes are still held in memory,** so a restart drops pending codes and running more than one
+  instance would break sign-in. Move them to a table or Redis before scaling out.
 - **SMS is not wired up.** OTPs are generated and returned as `devCode` outside production only.
-  Provide an `SmsSender` (Twilio, MSG91, ...) in `buildApp({ sms })`. OTP state is also in memory.
+  Provide an `SmsSender` (Twilio, MSG91, ...) in `buildApp({ sms })`.
 - **Apple/Google sign-in:** a `SocialVerifier` must be supplied in production (verify the id token
   against Apple/Google JWKS). Without one, `/v1/auth/social` returns 501. In dev it accepts
   `dev:<sub>:<name>` tokens.

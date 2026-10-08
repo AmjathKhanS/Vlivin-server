@@ -22,5 +22,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (config.NODE_ENV === 'production' && config.JWT_SECRET.startsWith('dev-only')) {
     throw new Error('JWT_SECRET must not use the development default in production');
   }
+  if (config.NODE_ENV === 'production' && !config.DATABASE_URL) {
+    throw new Error('DATABASE_URL is required in production');
+  }
   return config;
 }

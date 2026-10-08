@@ -2,11 +2,21 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { OutboxPushService } from '../src/services/push.js';
+import { createPglite } from '../src/store/pglite.js';
+import { migrate, PostgresStore } from '../src/store/postgres.js';
 
 export async function makeApp(now = new Date('2026-10-08T10:00:00Z')) {
   const clock = { now };
   const push = new OutboxPushService();
+  // TEST_STORE=pglite runs the whole suite against real Postgres (in-process).
+  let store;
+  if (process.env.TEST_STORE === 'pglite') {
+    const db = await createPglite();
+    await migrate(db);
+    store = new PostgresStore(db);
+  }
   const { app, ctx } = await buildApp({
+    ...(store ? { store } : {}),
     config: loadConfig({ NODE_ENV: 'test', JWT_SECRET: 'test-secret-test-secret-test-secret-1234' }),
     push,
     clock: () => clock.now,
