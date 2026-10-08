@@ -1,0 +1,20 @@
+# Render Blueprint: free staging deployment for client testing.
+# Render dashboard -> New -> Blueprint -> pick this repo. You will be asked for DATABASE_URL.
+services:
+  - type: web
+    name: vlivin-backend-staging
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false          # paste your Supabase connection string in the dashboard
+      - key: ALLOW_DEV_AUTH
+        value: "true"        # STAGING ONLY: sign-in codes are returned in the response
+      - key: CORS_ORIGINS
+        value: "*"

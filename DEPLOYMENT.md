@@ -1,7 +1,56 @@
 # Deploying the VLivIn backend
 
-A step-by-step guide to running the backend locally, on a staging server, and in production.
-Read "Before you go live" first. Real sign-in is not finished yet.
+A step-by-step guide to running the backend locally, on a free staging server for the client team, and in production.
+For production, read "Before you go live" first. Real sign-in is not finished yet.
+
+## Free staging deployment for the client team (start here)
+
+This setup costs nothing and gives the client team a public HTTPS and WebSocket URL to build against.
+It uses **Render** (free web service) for the server and **Supabase** (free Postgres) for the database.
+Limits below were checked on Render's and Supabase's pages on 2026-10-08. Check them again before relying on them.
+
+| What | Free limit | What it means for you |
+| --- | --- | --- |
+| Render web service | Spins down after 15 minutes with no traffic. Waking takes about a minute | The first request after a quiet period is slow. Tell the client team |
+| Render web service | 750 free instance hours per month per workspace | Enough for one always-on service. Services are suspended if the hours run out |
+| Render WebSockets | Messages on an open socket keep the service awake. New connections wake it | Live games and drawing work, but an idle app may still sleep |
+| Supabase database | 500 MB per project, 2 active projects, paused after 1 week of inactivity | Open the project in the Supabase dashboard to resume it. Data is kept |
+| Render's own free Postgres | Expires 30 days after creation | **Do not use it.** Use Supabase instead |
+
+**Staging sign-in.** The free setup runs with `ALLOW_DEV_AUTH=true`. The sign-in code comes back in the
+response (`devCode`), so testers can sign in without SMS. Test tokens like `dev:user1:Asha` also work on
+`POST /v1/auth/social`. Share this URL only with your client team. Never use this setting for real users.
+
+### Steps (about 15 minutes)
+
+1. **Database.** Create a free project at supabase.com. Open **Project Settings, Database, Connection string**,
+   choose the **Session pooler** string and copy it. Replace the password placeholder with your database password.
+2. **Render account.** Sign up at render.com and connect your GitHub account.
+3. **Blueprint.** Click **New, Blueprint**, pick the `Vlivin-server` repo. Render reads `render.yaml` in the repo
+   and creates the `vlivin-backend-staging` service on the free plan.
+4. **Database setting.** When Render asks for `DATABASE_URL`, paste the Supabase string from step 1.
+   `JWT_SECRET` is generated for you.
+5. **Deploy.** Wait for the build to finish. The tables are created automatically on first start.
+6. **Check it.** Open `https://<your-service>.onrender.com/health`. You should see `{"status":"ok",...}`.
+7. **Send the client team** the base URL (`https://<your-service>.onrender.com/v1`), the realtime URL
+   (`wss://<your-service>.onrender.com/v1/ws?token=<jwt>`) and the API reference doc.
+
+### Test it end to end
+
+```bash
+BASE=https://<your-service>.onrender.com
+curl -s -X POST $BASE/v1/auth/phone/request -H 'content-type: application/json' -d '{"phone":"+919800000001"}'
+# -> {"devCode":"123456"}
+curl -s -X POST $BASE/v1/auth/phone/verify -H 'content-type: application/json' -d '{"phone":"+919800000001","code":"123456"}'
+# -> {"token":"...","isNew":true,"user":{...}}
+```
+
+### When you are ready for real users
+
+Set `ALLOW_DEV_AUTH` to `false`, connect an SMS provider and real Apple/Google sign-in (section 7),
+and move to a paid plan so the service does not sleep. Everything else in this guide still applies.
+
+---
 
 ## 1. What you need
 
@@ -68,6 +117,7 @@ SSL is switched on automatically for any host that is not localhost.
 | `DATABASE_URL` | production | the Supabase string | Postgres connection. The server refuses to start in production without it |
 | `CORS_ORIGINS` | no | `https://app.example.com` | Comma-separated allowed origins, or `*`. A native mobile app is not affected by CORS |
 | `PAIR_CODE_TTL_HOURS` | no | `24` | How long an invite code lasts |
+| `ALLOW_DEV_AUTH` | no | `false` | Staging only. `true` returns sign-in codes in responses and accepts test tokens. Never for real users |
 | `EXPO_ACCESS_TOKEN` | no | from expo.dev | Sends real push notifications. Without it, pushes are only recorded |
 
 Generate a secret:
@@ -124,9 +174,9 @@ These are not finished yet. The first two block real users from signing in.
    check is added.
 3. **Run only one copy of the server.** Pending sign-in codes and the realtime rooms live in the server's memory.
    Two copies would break sign-in and stop partners seeing each other's live moves. Moving them to Redis is the fix before you scale out.
-4. **Staging only:** setting `NODE_ENV=development` on a server makes it return sign-in codes and accept test
-   tokens (`dev:<id>:<name>`). That is handy for testing the app on a private staging server.
-   Never do this on a public server with real users.
+4. **Staging only:** `ALLOW_DEV_AUTH=true` makes the server return sign-in codes and accept test
+   tokens (`dev:<id>:<name>`). That is handy for the client team on a staging server.
+   Never turn it on for a server with real users. The server logs a warning at start-up when it is on.
 5. **Image uploads.** The app uploads doodles and photos to storage itself (for example Supabase Storage) and sends the
    link to the API. There is no upload endpoint.
 6. **Backups.** Turn on automatic backups for the database (Supabase has this on paid plans).

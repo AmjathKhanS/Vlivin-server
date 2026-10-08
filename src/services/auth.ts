@@ -13,7 +13,7 @@ export class AuthService {
   private otps = new Map<string, OtpRecord>();
   constructor(private ctx: Ctx) {}
 
-  /** Returns the code only outside production so devs/tests can sign in without SMS. */
+  /** Returns the code only outside production (or in ALLOW_DEV_AUTH staging) so testers can sign in without SMS. */
   async requestOtp(phone: string): Promise<{ devCode?: string }> {
     const now = this.ctx.clock().getTime();
     const existing = this.otps.get(phone);
@@ -25,7 +25,8 @@ export class AuthService {
       hash: hashOtp(phone, code), expiresAt: now + OTP_TTL_MS, attempts: 0, sentAt: now,
     });
     await this.ctx.sms.send(phone, `Your VLivIn code is ${code}`);
-    return this.ctx.config.NODE_ENV === 'production' ? {} : { devCode: code };
+    const exposeCode = this.ctx.config.NODE_ENV !== 'production' || this.ctx.config.ALLOW_DEV_AUTH;
+    return exposeCode ? { devCode: code } : {};
   }
 
   async verifyOtp(phone: string, code: string): Promise<{ user: User; isNew: boolean }> {

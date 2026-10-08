@@ -84,3 +84,27 @@ describe('pairing', () => {
     expect(res.json().error.code).toBe('not_paired');
   });
 });
+
+describe('staging dev-auth switch', () => {
+  const prod = { NODE_ENV: 'production', JWT_SECRET: 'x'.repeat(40), DATABASE_URL: 'postgres://unused' } as const;
+
+  it('hides sign-in codes and dev tokens in production by default', async () => {
+    const { buildApp } = await import('../src/app.js');
+    const { loadConfig } = await import('../src/config.js');
+    const { app } = await buildApp({ config: loadConfig({ ...prod }) });
+    const r = await app.inject({ method: 'POST', url: '/v1/auth/phone/request', payload: { phone: '+919800000050' } });
+    expect(r.json().devCode).toBeUndefined();
+    const s = await app.inject({ method: 'POST', url: '/v1/auth/social', payload: { provider: 'google', idToken: 'dev:s:Name' } });
+    expect(s.statusCode).toBe(501);
+  });
+
+  it('returns codes and accepts dev tokens only when ALLOW_DEV_AUTH=true', async () => {
+    const { buildApp } = await import('../src/app.js');
+    const { loadConfig } = await import('../src/config.js');
+    const { app } = await buildApp({ config: loadConfig({ ...prod, ALLOW_DEV_AUTH: 'true' }) });
+    const r = await app.inject({ method: 'POST', url: '/v1/auth/phone/request', payload: { phone: '+919800000051' } });
+    expect(r.json().devCode).toMatch(/^\d{6}$/);
+    const s = await app.inject({ method: 'POST', url: '/v1/auth/social', payload: { provider: 'google', idToken: 'dev:s:Name' } });
+    expect(s.statusCode).toBe(200);
+  });
+});

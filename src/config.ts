@@ -10,6 +10,9 @@ const schema = z.object({
   PAIR_CODE_TTL_HOURS: z.coerce.number().positive().default(24),
   EXPO_ACCESS_TOKEN: z.string().optional(),
   DATABASE_URL: z.string().optional(),
+  // Staging only: return OTP codes in the response and accept `dev:<id>:<name>` social tokens,
+  // even with NODE_ENV=production. NEVER enable for real users.
+  ALLOW_DEV_AUTH: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
 });
 
 export type Config = z.infer<typeof schema>;

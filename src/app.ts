@@ -49,9 +49,13 @@ export async function buildApp(deps: AppDeps = {}): Promise<{ app: FastifyInstan
     push: deps.push ??
       (config.EXPO_ACCESS_TOKEN ? new ExpoPushService(config.EXPO_ACCESS_TOKEN, (m) => app.log.warn(m)) : new OutboxPushService()),
     sms: deps.sms ?? { send: async (phone) => { app.log.info({ phone }, 'SMS provider not configured; OTP not sent'); } },
-    social: deps.social !== undefined ? deps.social : isProd ? null : devSocialVerifier,
+    social: deps.social !== undefined ? deps.social : isProd && !config.ALLOW_DEV_AUTH ? null : devSocialVerifier,
     clock: deps.clock ?? (() => new Date()),
   };
+
+  if (config.ALLOW_DEV_AUTH && isProd) {
+    app.log.warn('ALLOW_DEV_AUTH is on: sign-in codes are returned in API responses. Staging only!');
+  }
 
   await app.register(helmet);
   await app.register(cors, {
